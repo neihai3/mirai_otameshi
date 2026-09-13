@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>献立プランナー</title>
+  <style>
+    /* ===== リセット・ベース ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ===== ヘッダー ===== */
+    header {
+      background: linear-gradient(135deg, #4caf50, #81c784);
+      color: white;
+      padding: 20px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 1.6rem; display: flex; align-items: center; gap: 10px; }
+    header p { font-size: 0.9rem; opacity: 0.9; margin-top: 4px; }
+
+    /* ===== レイアウト ===== */
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+
+    /* ===== カード ===== */
+    .card {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #2e7d32;
+      border-bottom: 2px solid #e8f5e9;
+      padding-bottom: 10px;
+    }
+
+    /* ===== 食材パネル ===== */
+    .category { margin-bottom: 16px; }
+    .category-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .ingredient-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .ingredient-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 2px solid #e0e0e0;
+      background: white;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .ingredient-chip:hover { border-color: #81c784; }
+    .ingredient-chip.selected {
+      background: #e8f5e9;
+      border-color: #4caf50;
+      color: #2e7d32;
+      font-weight: 600;
+    }
+    .ingredient-chip .chip-icon { font-size: 1rem; }
+
+    /* ===== ボタン ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #4caf50; color: white; }
+    .btn-primary:hover { background: #388e3c; }
+    .btn-primary:disabled { background: #bdbdbd; cursor: not-allowed; }
+    .btn-secondary { background: #f5f5f5; color: #555; }
+    .btn-secondary:hover { background: #e0e0e0; }
+    .btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+    .btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+    /* ===== 選択済み食材バッジ ===== */
+    .selected-count {
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 12px;
+    }
+    .selected-count span { color: #4caf50; font-weight: 700; }
+
+    /* ===== 献立テーブル ===== */
+    .week-grid { display: flex; flex-direction: column; gap: 10px; }
+    .day-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 1fr 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    @media (max-width: 600px) {
+      .day-row { grid-template-columns: 60px 1fr; }
+      .day-row .meal-cell:nth-child(3),
+      .day-row .meal-cell:nth-child(4) { display: none; }
+    }
+    .day-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      background: #f1f8e9;
+      border-radius: 8px;
+      color: #558b2f;
+    }
+    .day-label.weekend { background: #fce4ec; color: #c62828; }
+    .meal-header {
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #999;
+      padding: 4px;
+    }
+    .meal-cell {
+      background: #fafafa;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      min-height: 70px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .meal-cell:hover { border-color: #81c784; background: #f9fbe7; }
+    .meal-cell .meal-name { font-weight: 600; color: #333; margin-bottom: 4px; }
+    .meal-cell .meal-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-top: 6px;
+    }
+    .tag {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: #e8f5e9;
+      color: #388e3c;
+    }
+    .meal-cell .reroll-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .meal-cell:hover .reroll-btn { opacity: 1; }
+    .meal-cell.empty { background: #fafafa; color: #bbb; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
+
+    /* ===== 買い物リスト ===== */
+    .shopping-section { margin-top: 24px; }
+    .shopping-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .shopping-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #fff8e1;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      border: 1.5px solid #ffe082;
+    }
+    .shopping-item.have { background: #f5f5f5; border-color: #e0e0e0; text-decoration: line-through; color: #aaa; }
+    .shopping-item input[type="checkbox"] { accent-color: #4caf50; width: 16px; height: 16px; cursor: pointer; }
+
+    /* ===== 空状態 ===== */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #bbb;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* ===== タブ ===== */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+    .tab {
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+      border: none;
+      background: #e8e8e8;
+      color: #777;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab.active { background: white; color: #2e7d32; box-shadow: 0 -2px 0 #4caf50 inset; }
+
+    /* ===== トースト ===== */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #323232;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🥦 献立プランナー</h1>
+  <p>冷蔵庫の食材を選んで、1週間の献立を自動生成しましょう</p>
+</header>
+
+<div class="container">
+  <div class="layout">
+
+    <!-- 左：食材選択パネル -->
+    <div class="card" id="ingredient-panel">
+      <div class="card-title">🛒 冷蔵庫の食材</div>
+      <div id="ingredient-list"></div>
+      <p class="selected-count">選択中：<span id="selected-count">0</span> 種類</p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="generate-btn" onclick="generateMenu()" disabled>
+          🍽️ 献立を作る
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="clearAll()">リセット</button>
+      </div>
+    </div>
+
+    <!-- 右：献立 + 買い物リスト -->
+    <div>
+      <div class="card">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('menu', this)">📅 1週間の献立</button>
+          <button class="tab" onclick="switchTab('shopping', this)">🛍️ 買い物リスト</button>
+        </div>
+
+        <!-- 献立タブ -->
+        <div id="tab-menu">
+          <div id="menu-area">
+            <div class="empty-state">
+              <div class="icon">🥗</div>
+              <p>左から食材を選んで<br>「献立を作る」を押してください</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 買い物リストタブ -->
+        <div id="tab-shopping" style="display:none;">
+          <div id="shopping-area">
+            <div class="empty-state">
+              <div class="icon">🛍️</div>
+              <p>献立を生成すると<br>不足食材が表示されます</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ===========================
+//  食材データ
+// ===========================
+const INGREDIENTS = {
+  '🥩 肉類': [
+    { id: 'chicken', name: '鶏肉', icon: '🍗' },
+    { id: 'pork', name: '豚肉', icon: '🥩' },
+    { id: 'beef', name: '牛肉', icon: '🥩' },
+    { id: 'minced', name: 'ひき肉', icon: '🍖' },
+    { id: 'bacon', name: 'ベーコン', icon: '🥓' },
+  ],
+  '🐟 魚介類': [
+    { id: 'salmon', name: '鮭', icon: '🐟' },
+    { id: 'tuna', name: 'ツナ缶', icon: '🐠' },
+    { id: 'shrimp', name: 'えび', icon: '🦐' },
+    { id: 'squid', name: 'イカ', icon: '🦑' },
+    { id: 'egg', name: '卵', icon: '🥚' },
+  ],
+  '🥦 野菜類': [
+    { id: 'onion', name: '玉ねぎ', icon: '🧅' },
+    { id: 'potato', name: 'じゃがいも', icon: '🥔' },
+    { id: 'carrot', name: 'にんじん', icon: '🥕' },
+    { id: 'cabbage', name: 'キャベツ', icon: '🥬' },
+    { id: 'spinach', name: 'ほうれん草', icon: '🥬' },
+    { id: 'tomato', name: 'トマト', icon: '🍅' },
+    { id: 'eggplant', name: 'なす', icon: '🍆' },
+    { id: 'broccoli', name: 'ブロッコリー', icon: '🥦' },
+    { id: 'mushroom', name: 'きのこ', icon: '🍄' },
+    { id: 'tofu', name: '豆腐', icon: '⬜' },
+  ],
+  '🫙 常備品': [
+    { id: 'rice', name: 'ご飯', icon: '🍚' },
+    { id: 'pasta', name: 'パスタ', icon: '🍝' },
+    { id: 'bread', name: 'パン', icon: '🍞' },
+    { id: 'soysauce', name: '醤油', icon: '🫙' },
+    { id: 'miso', name: '味噌', icon: '🫙' },
+    { id: 'cheese', name: 'チーズ', icon: '🧀' },
+    { id: 'butter', name: 'バター', icon: '🧈' },
+  ],
+};
+
+// ===========================
+//  レシピデータ
+// ===========================
+const RECIPES = [
+  { id: 1,  name: '鶏の唐揚げ',        required: ['chicken'],              optional: ['soysauce'],            tags: ['和食', '揚げ物'] },
+  { id: 2,  name: '親子丼',            required: ['chicken', 'egg'],       optional: ['onion', 'rice'],       tags: ['和食', '丼'] },
+  { id: 3,  name: '豚の生姜焼き',      required: ['pork'],                 optional: ['onion', 'cabbage'],    tags: ['和食', '炒め物'] },
+  { id: 4,  name: '肉じゃが',          required: ['beef', 'potato'],       optional: ['onion', 'carrot'],     tags: ['和食', '煮物'] },
+  { id: 5,  name: 'ハンバーグ',        required: ['minced'],               optional: ['onion', 'tomato'],     tags: ['洋食'] },
+  { id: 6,  name: 'チキンカレー',      required: ['chicken', 'carrot'],    optional: ['onion', 'potato'],     tags: ['洋食', 'カレー'] },
+  { id: 7,  name: 'キーマカレー',      required: ['minced'],               optional: ['onion', 'tomato'],     tags: ['洋食', 'カレー'] },
+  { id: 8,  name: '鮭のムニエル',      required: ['salmon', 'butter'],     optional: ['broccoli'],            tags: ['洋食', '魚料理'] },
+  { id: 9,  name: '鮭の塩焼き',        required: ['salmon'],               optional: ['rice'],                tags: ['和食', '魚料理'] },
+  { id: 10, name: 'えびチリ',          required: ['shrimp', 'tomato'],     optional: ['onion'],               tags: ['中華'] },
+  { id: 11, name: 'えびフライ',        required: ['shrimp'],               optional: [],                      tags: ['洋食', '揚げ物'] },
+  { id: 12, name: 'イカと野菜の炒め物',required: ['squid', 'onion'],       optional: ['cabbage'],             tags: ['和食', '炒め物'] },
+  { id: 13, name: '野菜炒め',          required: ['cabbage', 'carrot'],    optional: ['pork', 'onion'],       tags: ['中華', '炒め物'] },
+  { id: 14, name: '麻婆豆腐',          required: ['tofu', 'minced'],       optional: ['onion'],               tags: ['中華'] },
+  { id: 15, name: '冷奴',              required: ['tofu'],                 optional: ['soysauce'],            tags: ['和食', '副菜'] },
+  { id: 16, name: 'オムライス',        required: ['egg', 'rice'],          optional: ['onion', 'chicken'],    tags: ['洋食'] },
+  { id: 17, name: 'スクランブルエッグ', required: ['egg', 'butter'],       optional: [],                      tags: ['洋食'] },
+  { id: 18, name: 'スパゲッティミートソース', required: ['minced', 'pasta'], optional: ['onion', 'tomato'],  tags: ['洋食', 'パスタ'] },
+  { id: 19, name: 'ペペロンチーノ',    required: ['pasta'],                optional: ['shrimp', 'spinach'],   tags: ['洋食', 'パスタ'] },
+  { id: 20, name: 'ナポリタン',        required: ['pasta', 'bacon'],       optional: ['onion', 'tomato'],     tags: ['洋食', 'パスタ'] },
+  { id: 21, name: 'ポテトサラダ',      required: ['potato'],               optional: ['carrot', 'onion'],     tags: ['洋食', '副菜'] },
+  { id: 22, name: 'コロッケ',          required: ['potato', 'minced'],     optional: ['onion'],               tags: ['洋食', '揚げ物'] },
+  { id: 23, name: '豚汁',             required: ['pork', 'miso'],         optional: ['carrot', 'potato', 'onion'], tags: ['和食', '汁物'] },
+  { id: 24, name: '味噌汁',           required: ['miso'],                 optional: ['tofu', 'mushroom'],    tags: ['和食', '汁物'] },
+  { id: 25, name: 'きのこパスタ',      required: ['mushroom', 'pasta'],    optional: ['bacon', 'butter'],     tags: ['洋食', 'パスタ'] },
+  { id: 26, name: 'きのこの炒め物',    required: ['mushroom'],             optional: ['soysauce'],            tags: ['和食', '副菜'] },
+  { id: 27, name: 'ほうれん草のおひたし', required: ['spinach'],           optional: ['soysauce'],            tags: ['和食', '副菜'] },
+  { id: 28, name: 'なすの揚げ浸し',   required: ['eggplant', 'soysauce'], optional: [],                      tags: ['和食'] },
+  { id: 29, name: 'カプレーゼ',        required: ['tomato', 'cheese'],     optional: [],                      tags: ['洋食', '副菜'] },
+  { id: 30, name: 'グラタン',          required: ['cheese', 'butter'],     optional: ['potato', 'broccoli', 'chicken'], tags: ['洋食'] },
+  { id: 31, name: 'ブロッコリーのサラダ', required: ['broccoli'],          optional: [],                      tags: ['洋食', '副菜'] },
+  { id: 32, name: 'チーズハンバーグ',  required: ['minced', 'cheese'],     optional: ['onion'],               tags: ['洋食'] },
+  { id: 33, name: 'BLTサンドイッチ',   required: ['bacon', 'tomato', 'bread'], optional: [],                 tags: ['洋食'] },
+  { id: 34, name: 'フレンチトースト',  required: ['bread', 'egg', 'butter'], optional: [],                   tags: ['洋食'] },
+  { id: 35, name: '回鍋肉',           required: ['pork', 'cabbage'],      optional: ['onion'],               tags: ['中華'] },
+  { id: 36, name: 'チキンソテー',      required: ['chicken', 'butter'],    optional: ['broccoli'],            tags: ['洋食'] },
+  { id: 37, name: '鶏そぼろ丼',        required: ['minced', 'egg', 'rice'], optional: [],                    tags: ['和食', '丼'] },
+  { id: 38, name: 'トマト炒め',        required: ['tomato', 'egg'],        optional: [],                     tags: ['中華'] },
+  { id: 39, name: 'ツナサラダ',        required: ['tuna', 'tomato'],       optional: ['cabbage'],             tags: ['洋食', '副菜'] },
+  { id: 40, name: 'ツナマヨ丼',        required: ['tuna', 'rice'],         optional: [],                     tags: ['和食', '丼'] },
+];
+
+const DAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
+const MEALS = ['朝食', '昼食', '夕食'];
+
+// ===========================
+//  状態
+// ===========================
+let selectedIngredients = new Set();
+let currentMenu = []; // [{day, morning, lunch, dinner}]
+let shoppingChecked = new Set();
+
+// ===========================
+//  初期化：食材リスト描画
+// ===========================
+function renderIngredients() {
+  const container = document.getElementById('ingredient-list');
+  container.innerHTML = '';
+  for (const [category, items] of Object.entries(INGREDIENTS)) {
+    const div = document.createElement('div');
+    div.className = 'category';
+    div.innerHTML = `<div class="category-label">${category}</div>
+      <div class="ingredient-grid">${
+        items.map(item => `
+          <div class="ingredient-chip ${selectedIngredients.has(item.id) ? 'selected' : ''}"
+               onclick="toggleIngredient('${item.id}')" data-id="${item.id}">
+            <span class="chip-icon">${item.icon}</span>${item.name}
+          </div>`).join('')
+      }</div>`;
+    container.appendChild(div);
+  }
+}
+
+function toggleIngredient(id) {
+  if (selectedIngredients.has(id)) {
+    selectedIngredients.delete(id);
+  } else {
+    selectedIngredients.add(id);
+  }
+  document.querySelectorAll(`.ingredient-chip[data-id="${id}"]`).forEach(el => {
+    el.classList.toggle('selected', selectedIngredients.has(id));
+  });
+  document.getElementById('selected-count').textContent = selectedIngredients.size;
+  document.getElementById('generate-btn').disabled = selectedIngredients.size === 0;
+}
+
+function clearAll() {
+  selectedIngredients.clear();
+  currentMenu = [];
+  shoppingChecked.clear();
+  renderIngredients();
+  document.getElementById('selected-count').textContent = 0;
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('menu-area').innerHTML = `
+    <div class="empty-state"><div class="icon">🥗</div><p>左から食材を選んで<br>「献立を作る」を押してください</p></div>`;
+  document.getElementById('shopping-area').innerHTML = `
+    <div class="empty-state"><div class="icon">🛍️</div><p>献立を生成すると<br>不足食材が表示されます</p></div>`;
+}
+
+// ===========================
+//  レシピマッチング
+// ===========================
+function getMatchedRecipes() {
+  const have = selectedIngredients;
+  return RECIPES
+    .filter(r => r.required.some(ing => have.has(ing)))
+    .map(r => {
+      const matchCount = r.required.filter(ing => have.has(ing)).length
+                       + r.optional.filter(ing => have.has(ing)).length;
+      const score = matchCount / (r.required.length + r.optional.length + 0.1);
+      return { ...r, score };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+function pickUniqueRecipes(pool, count) {
+  const used = new Set();
+  const result = [];
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  for (const r of shuffled) {
+    if (!used.has(r.id)) {
+      used.add(r.id);
+      result.push(r);
+      if (result.length === count) break;
+    }
+  }
+  // 足りなければ繰り返し使用（インデックスを固定して無限ループ回避）
+  let fallbackIndex = 0;
+  while (result.length < count) {
+    result.push(shuffled[fallbackIndex % shuffled.length]);
+    fallbackIndex++;
+  }
+  return result;
+}
+
+// ===========================
+//  献立生成
+// ===========================
+function generateMenu() {
+  const pool = getMatchedRecipes();
+  if (pool.length === 0) {
+    showToast('マッチするレシピが見つかりませんでした');
+    return;
+  }
+
+  // 21食分（朝・昼・夜 × 7日）をランダム選択
+  const picks = pickUniqueRecipes(pool, 21);
+  currentMenu = DAYS.map((day, i) => ({
+    day,
+    morning: picks[i * 3],
+    lunch:   picks[i * 3 + 1],
+    dinner:  picks[i * 3 + 2],
+  }));
+
+  renderMenu();
+  renderShopping();
+  showToast('献立を生成しました 🎉');
+}
+
+// ===========================
+//  献立再ロール（1マス）
+// ===========================
+function rerollCell(dayIndex, mealKey) {
+  const pool = getMatchedRecipes();
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  currentMenu[dayIndex][mealKey] = shuffled[0] || currentMenu[dayIndex][mealKey];
+  renderMenu();
+  renderShopping();
+  showToast('料理を変更しました 🔄');
+}
+
+// ===========================
+//  献立描画
+// ===========================
+function renderMenu() {
+  const area = document.getElementById('menu-area');
+  const mealKeys = ['morning', 'lunch', 'dinner'];
+
+  area.innerHTML = `
+    <div class="week-grid">
+      <div class="day-row">
+        <div></div>
+        ${MEALS.map(m => `<div class="meal-header">${m}</div>`).join('')}
+      </div>
+      ${currentMenu.map((day, di) => `
+        <div class="day-row">
+          <div class="day-label ${di >= 5 ? 'weekend' : ''}">${day.day.replace('曜日', '')}</div>
+          ${mealKeys.map(key => {
+            const recipe = day[key];
+            return recipe
+              ? `<div class="meal-cell" title="${recipe.name}">
+                   <button class="reroll-btn" onclick="rerollCell(${di},'${key}')" title="変更">🔄</button>
+                   <div class="meal-name">${recipe.name}</div>
+                   <div class="meal-tags">${recipe.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                 </div>`
+              : `<div class="meal-cell empty">—</div>`;
+          }).join('')}
+        </div>`).join('')}
+    </div>`;
+}
+
+// ===========================
+//  買い物リスト
+// ===========================
+function renderShopping() {
+  if (currentMenu.length === 0) return;
+
+  // 使用レシピの全食材を集計
+  const needed = new Set();
+  currentMenu.forEach(day => {
+    ['morning', 'lunch', 'dinner'].forEach(key => {
+      const r = day[key];
+      if (r) {
+        [...r.required, ...r.optional].forEach(ing => needed.add(ing));
+      }
+    });
+  });
+
+  // 手持ちにないものが「買うべき食材」
+  const toBuy = [...needed].filter(id => !selectedIngredients.has(id));
+  const have  = [...needed].filter(id =>  selectedIngredients.has(id));
+
+  // 食材名マップ
+  const nameMap = {};
+  const iconMap = {};
+  Object.values(INGREDIENTS).flat().forEach(ing => {
+    nameMap[ing.id] = ing.name;
+    iconMap[ing.id] = ing.icon;
+  });
+
+  const area = document.getElementById('shopping-area');
+  if (toBuy.length === 0 && have.length === 0) {
+    area.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>全ての食材が揃っています！</p></div>';
+    return;
+  }
+
+  area.innerHTML = `
+    ${toBuy.length > 0 ? `
+      <p style="font-weight:700;color:#e65100;margin-bottom:8px;">🛒 買う必要がある食材 (${toBuy.length}種)</p>
+      <div class="shopping-grid">
+        ${toBuy.map(id => `
+          <label class="shopping-item ${shoppingChecked.has(id) ? 'have' : ''}">
+            <input type="checkbox" ${shoppingChecked.has(id) ? 'checked' : ''}
+              onchange="toggleShoppingCheck('${id}', this.checked)" />
+            ${iconMap[id] || '🔸'} ${nameMap[id] || id}
+          </label>`).join('')}
+      </div>` : ''}
+    ${have.length > 0 ? `
+      <p style="font-weight:700;color:#388e3c;margin-top:16px;margin-bottom:8px;">✅ 手持ち食材 (${have.length}種)</p>
+      <div class="shopping-grid">
+        ${have.map(id => `
+          <div class="shopping-item have">
+            ${iconMap[id] || '🔸'} ${nameMap[id] || id}
+          </div>`).join('')}
+      </div>` : ''}`;
+}
+
+function toggleShoppingCheck(id, checked) {
+  if (checked) shoppingChecked.add(id);
+  else shoppingChecked.delete(id);
+  // チェック済みアイテムのスタイル更新
+  document.querySelectorAll('.shopping-item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    if (cb && cb.onchange) {
+      // re-renderで対応
+    }
+  });
+  renderShopping();
+}
+
+// ===========================
+//  タブ切り替え
+// ===========================
+function switchTab(name, btn) {
+  document.getElementById('tab-menu').style.display      = name === 'menu'     ? '' : 'none';
+  document.getElementById('tab-shopping').style.display  = name === 'shopping' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ===========================
+//  トースト通知
+// ===========================
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ===========================
+//  起動
+// ===========================
+renderIngredients();
+</script>
+</body>
+</html>
