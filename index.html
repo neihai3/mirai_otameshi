@@ -158,6 +158,26 @@
     }
     .meal-cell:hover { border-color: #81c784; background: #f9fbe7; }
     .meal-cell .meal-name { font-weight: 600; color: #333; margin-bottom: 4px; }
+    .meal-cell .calorie-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 3px 7px;
+      border-radius: 10px;
+      background: #fff3e0;
+      color: #e65100;
+      font-size: 0.72rem;
+      font-weight: 700;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-3px);
+      transition: opacity 0.15s, visibility 0.15s, transform 0.15s;
+    }
+    .meal-cell:hover .calorie-badge {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
     .meal-cell .meal-tags {
       display: flex;
       flex-wrap: wrap;
@@ -394,6 +414,14 @@ const RECIPES = [
   { id: 40, name: 'ツナマヨ丼',        required: ['tuna', 'rice'],         optional: [],                     tags: ['和食', '丼'] },
 ];
 
+// 1食あたりの目安カロリー（kcal）
+const RECIPE_CALORIES = {
+  1: 480, 2: 620, 3: 430, 4: 520, 5: 560, 6: 680, 7: 650, 8: 390, 9: 280, 10: 310,
+  11: 420, 12: 260, 13: 240, 14: 360, 15: 110, 16: 590, 17: 210, 18: 580, 19: 490, 20: 610,
+  21: 220, 22: 410, 23: 300, 24: 80, 25: 520, 26: 150, 27: 45, 28: 180, 29: 230, 30: 460,
+  31: 90, 32: 640, 33: 470, 34: 390, 35: 510, 36: 430, 37: 560, 38: 190, 39: 180, 40: 540,
+};
+
 const DAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
 const MEALS = ['朝食', '昼食', '夕食'];
 
@@ -542,9 +570,10 @@ function renderMenu() {
           ${mealKeys.map(key => {
             const recipe = day[key];
             return recipe
-              ? `<div class="meal-cell" title="${recipe.name}">
+                  ? `<div class="meal-cell" title="${recipe.name}（${RECIPE_CALORIES[recipe.id]}kcal）">
                    <button class="reroll-btn" onclick="rerollCell(${di},'${key}')" title="変更">🔄</button>
                    <div class="meal-name">${recipe.name}</div>
+                    <span class="calorie-badge">${RECIPE_CALORIES[recipe.id]} kcal</span>
                    <div class="meal-tags">${recipe.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
                  </div>`
               : `<div class="meal-cell empty">—</div>`;
